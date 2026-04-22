@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <group android:checkableBehavior="single">
+        <item
+            android:id="@+id/nav_patient_connection"
+            android:icon="@android:drawable/ic_menu_myplaces"
+            android:title="환자 / 연결" />
+
+        <item
+            android:id="@+id/nav_session_control"
+            android:icon="@android:drawable/ic_media_play"
+            android:title="세션 제어" />
+
+        <item
+            android:id="@+id/nav_status_log"
+            android:icon="@android:drawable/ic_menu_info_details"
+            android:title="상태 로그" />
+    </group>
+
+</menu>

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg_main">#0B1220</color>
+    <color name="bg_surface">#111A2E</color>
+    <color name="bg_card">#121C31</color>
+    <color name="bg_input">#18243D</color>
+    <color name="bg_console">#0D1424</color>
+
+    <color name="text_primary">#F8FAFC</color>
+    <color name="text_secondary">#94A3B8</color>
+    <color name="text_muted">#64748B</color>
+
+    <color name="stroke_soft">#24324D</color>
+
+    <color name="blue_primary">#2563EB</color>
+    <color name="blue_pressed">#1D4ED8</color>
+
+    <color name="green_primary">#16A34A</color>
+    <color name="green_pressed">#15803D</color>
+
+    <color name="red_primary">#DC2626</color>
+    <color name="red_pressed">#B91C1C</color>
+
+    <color name="warning_bg">#F59E0B</color>
+    <color name="warning_text">#FFF7ED</color>
+
+    <color name="danger_bg">#7F1D1D</color>
+    <color name="danger_text">#FEE2E2</color>
+
+    <color name="success_bg">#14532D</color>
+    <color name="success_text">#DCFCE7</color>
+
+    <color name="dot_green">#22C55E</color>
+    <color name="dot_red">#EF4444</color>
+</resources>
