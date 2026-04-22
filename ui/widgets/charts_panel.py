@@ -25,6 +25,7 @@ class ChartWidget(QFrame):
         self.setObjectName("Card")
         self._title = title
         self._logs: list[Log] = []
+        self._dialog: ChartDialog | None = None
         layout = QVBoxLayout(self)
         layout.setContentsMargins(14, 14, 14, 14)
         layout.setSpacing(10)
@@ -57,6 +58,7 @@ class ChartWidget(QFrame):
             ax.grid(True, alpha=0.3)
             ax.legend(loc="upper right")
         self.canvas.draw()
+        self._refresh_dialog()
 
     def plot_cumulative(self, logs: list[Log]) -> None:
         self._logs = logs
@@ -75,6 +77,7 @@ class ChartWidget(QFrame):
             ax.grid(True, alpha=0.3)
             ax.legend(loc="upper left")
         self.canvas.draw()
+        self._refresh_dialog()
 
     def _add_markers(self, ax, logs: list[Log], value_fn) -> None:
         warning_x: list[datetime] = []
@@ -98,8 +101,15 @@ class ChartWidget(QFrame):
         rcParams["axes.unicode_minus"] = False
 
     def _on_click(self, _event) -> None:
-        dialog = ChartDialog(self._title, self._logs, self)
-        dialog.exec()
+        if self._dialog is None:
+            self._dialog = ChartDialog(self._title, self._logs, self)
+        else:
+            self._dialog.update_logs(self._logs)
+        self._dialog.exec()
+
+    def _refresh_dialog(self) -> None:
+        if self._dialog is not None and self._dialog.isVisible():
+            self._dialog.update_logs(self._logs)
 
 
 class ChartDialog(QDialog):
@@ -197,6 +207,27 @@ class ChartDialog(QDialog):
         self._vline.set_visible(False)
         self._hline.set_visible(False)
         self.canvas.draw()
+
+    def update_logs(self, logs: list[Log]) -> None:
+        if not logs and self._logs:
+            return
+        if self._ax is None:
+            self._logs = logs
+            self._plot(self._title, logs)
+            return
+        current_xlim = self._ax.get_xlim()
+        current_ylim = self._ax.get_ylim()
+        self._logs = logs
+        self._plot(self._title, logs)
+        if self._base_xlim and self._base_ylim:
+            x_min = max(self._base_xlim[0], current_xlim[0])
+            x_max = min(self._base_xlim[1], current_xlim[1])
+            y_min = max(self._base_ylim[0], current_ylim[0])
+            y_max = min(self._base_ylim[1], current_ylim[1])
+            if x_min < x_max and y_min < y_max:
+                self._ax.set_xlim(x_min, x_max)
+                self._ax.set_ylim(y_min, y_max)
+        self.canvas.draw_idle()
 
     def _on_click(self, event) -> None:
         if self._ax is None or event.inaxes != self._ax:
@@ -365,13 +396,19 @@ class ChartDialog(QDialog):
         self.canvas.draw_idle()
 
     def _get_zoom_scale(self, event) -> float:
-        direction = getattr(event, "button", None)
-        if direction == "up":
+        delta = self._get_scroll_delta(event)
+        if delta > 0:
             return 0.9
-        if direction == "down":
+        if delta < 0:
             return 1.1
+        return 1.0
+
+    def _get_scroll_delta(self, event) -> int:
+        gui_event = getattr(event, "guiEvent", None)
+        if gui_event is not None:
+            return int(gui_event.angleDelta().y())
         step = getattr(event, "step", 0)
-        return 0.9 if step > 0 else 1.1
+        return int(step)
 
 
 class ChartsPanel(QWidget):

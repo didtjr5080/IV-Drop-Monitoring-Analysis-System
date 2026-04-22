@@ -50,6 +50,9 @@ def _light_styles() -> str:
             border-radius: 10px;
             padding: 8px 12px;
         }
+        QFormLayout QLabel {
+            color: #5c677d;
+        }
         QComboBox {
             background: #f2f5fb;
             border: 1px solid #e1e7f3;
@@ -150,6 +153,9 @@ def _dark_styles() -> str:
             border: 1px solid #2b3448;
             border-radius: 10px;
             padding: 8px 12px;
+        }
+        QFormLayout QLabel {
+            color: #9aa4b2;
         }
         QComboBox {
             background: #1f2635;

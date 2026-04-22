@@ -19,6 +19,7 @@ from PyQt6.QtWidgets import (
 from config.settings import SETTINGS
 from models.patient import Patient
 from models.session import Session
+from models.log import Log
 from services.analysis_service import AnalysisResult, analyze_logs
 from services.report_service import SessionReport, export_patient_report
 from services.firebase_service import FirestoreService
@@ -26,6 +27,7 @@ from services.mock_data_service import MockDataService
 from ui.widgets.charts_panel import ChartsPanel
 from ui.widgets.logs_panel import LogsPanel
 from ui.widgets.log_detail_dialog import LogDetailDialog
+from ui.widgets.add_patient_dialog import AddPatientDialog
 from ui.widgets.patient_card import PatientCard
 from ui.widgets.session_table import SessionTable
 from ui.widgets.sidebar import Sidebar
@@ -65,6 +67,8 @@ class MainWindow(QMainWindow):
         self.sidebar = Sidebar()
         self.sidebar.setFixedWidth(280)
         self.sidebar.patient_selected.connect(self._on_patient_selected)
+        self.sidebar.add_patient_requested.connect(self._add_patient)
+        self.sidebar.delete_patient_requested.connect(self._delete_selected_patient)
         content.addWidget(self.sidebar)
 
         self.center_panel = self._build_center_panel()
@@ -86,11 +90,12 @@ class MainWindow(QMainWindow):
 
         self.current_patient: Patient | None = None
         self.current_session: Session | None = None
+        self._log_cache: dict[tuple[str, str], list[Log]] = {}
         self.theme_mode = theme
         self.data_service = self._init_service()
 
         self.refresh_timer = QTimer(self)
-        self.refresh_timer.setInterval(500)
+        self.refresh_timer.setInterval(3000)
         self.refresh_timer.timeout.connect(self._reload_current)
         self.refresh_timer.start()
 
@@ -241,6 +246,16 @@ class MainWindow(QMainWindow):
         save_user_settings(UserSettings(theme_mode=self.theme_mode, resolution=size))
         super().closeEvent(event)
 
+    def focusInEvent(self, event) -> None:
+        if not self.refresh_timer.isActive():
+            self.refresh_timer.start()
+        super().focusInEvent(event)
+
+    def focusOutEvent(self, event) -> None:
+        if self.refresh_timer.isActive():
+            self.refresh_timer.stop()
+        super().focusOutEvent(event)
+
     def _load_patients(self) -> None:
         patients = self.data_service.get_patients()
         self.sidebar.set_patients(patients)
@@ -267,6 +282,14 @@ class MainWindow(QMainWindow):
         logs = self.data_service.get_logs(
             self.current_patient.patient_id, session.session_id
         )
+        cache_key = (self.current_patient.patient_id, session.session_id)
+        cached = self._log_cache.get(cache_key, [])
+        if not logs or (cached and len(logs) < len(cached)):
+            logs = cached
+        if logs:
+            self._log_cache[cache_key] = logs
+        else:
+            return
         analysis = analyze_logs(logs)
         self.summary_cards.update_metrics(analysis)
         self.charts_panel.update_charts(logs)
@@ -274,9 +297,28 @@ class MainWindow(QMainWindow):
 
     def _reload_current(self) -> None:
         self._load_patients()
-        if self.current_patient:
-            self._on_patient_selected(self.current_patient)
-            if self.current_session:
+        if not self.current_patient:
+            return
+
+        sessions = self.data_service.get_sessions(self.current_patient.patient_id)
+        self.session_table.set_sessions(sessions)
+        status = "NORMAL"
+        if sessions:
+            if sessions[0].alert_count > 0:
+                status = "ALERT"
+            elif sessions[0].warning_count > 0:
+                status = "WARNING"
+        self.patient_card.update_patient(self.current_patient, status)
+
+        if self.current_session:
+            matched = next(
+                (s for s in sessions if s.session_id == self.current_session.session_id),
+                None,
+            )
+            if matched is None:
+                return
+            else:
+                self.current_session = matched
                 self._on_session_selected(self.current_session)
 
     def _export_report(self) -> None:
@@ -351,3 +393,66 @@ class MainWindow(QMainWindow):
 
         self.current_session = None
         self._on_patient_selected(self.current_patient)
+
+    def _delete_selected_patient(self) -> None:
+        if not self.current_patient:
+            self._show_error("환자 삭제", "삭제할 환자를 선택하세요.")
+            return
+        confirm = QMessageBox.question(
+            self,
+            "환자 삭제",
+            f"환자 {self.current_patient.name} ({self.current_patient.patient_id})을(를) 삭제할까요?\n"
+            "세션 및 로그가 모두 삭제됩니다.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if confirm != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            self.data_service.delete_patient(self.current_patient.patient_id)
+        except Exception as exc:
+            self._show_error("환자 삭제 실패", f"삭제 중 오류가 발생했습니다.\n{exc}")
+            return
+        self.current_patient = None
+        self.current_session = None
+        self.summary_cards.update_metrics(None)
+        self.charts_panel.update_charts([])
+        self.logs_panel.update_logs([])
+        self._load_patients()
+
+    def _add_patient(self) -> None:
+        dialog = AddPatientDialog(self)
+        next_id = self._generate_patient_id()
+        if next_id:
+            dialog.set_patient_id(next_id)
+        if dialog.exec() != dialog.DialogCode.Accepted:
+            return
+        patient_id, name, bed_number = dialog.get_values()
+        if not patient_id or not name or not bed_number:
+            self._show_error("환자 추가", "모든 입력값을 채워주세요.")
+            return
+        if self._patient_id_exists(patient_id):
+            self._show_error("환자 추가", "이미 존재하는 환자 ID입니다.")
+            return
+        try:
+            self.data_service.add_patient(patient_id, name, bed_number)
+        except Exception as exc:
+            self._show_error("환자 추가 실패", f"추가 중 오류가 발생했습니다.\n{exc}")
+            return
+        self._load_patients()
+
+    def _patient_id_exists(self, patient_id: str) -> bool:
+        patients = self.data_service.get_patients()
+        target = patient_id.strip().lower()
+        return any(p.patient_id.lower() == target for p in patients)
+
+    def _generate_patient_id(self) -> str:
+        patients = self.data_service.get_patients()
+        numbers: list[int] = []
+        for patient in patients:
+            pid = patient.patient_id.lower()
+            if pid.startswith("patient_"):
+                suffix = pid.replace("patient_", "", 1)
+                if suffix.isdigit():
+                    numbers.append(int(suffix))
+        next_number = max(numbers, default=0) + 1
+        return f"patient_{next_number:03d}"

@@ -12,18 +12,21 @@ from models.session import Session
 @dataclass(frozen=True)
 class MockDataService:
     seed: int = 42
+    _patients: list[Patient] | None = None
 
     def __post_init__(self) -> None:
         random.seed(self.seed)
 
     def get_patients(self) -> list[Patient]:
-        now = datetime.now(timezone.utc)
-        return [
-            Patient("P-1001", "김하늘", "A-01", now - timedelta(days=12)),
-            Patient("P-1002", "이준호", "A-02", now - timedelta(days=8)),
-            Patient("P-1003", "박서연", "B-03", now - timedelta(days=4)),
-            Patient("P-1004", "최민수", "C-01", now - timedelta(days=1)),
-        ]
+        if self._patients is None:
+            now = datetime.now(timezone.utc)
+            self._patients = [
+                Patient("P-1001", "김하늘", "A-01", now - timedelta(days=12)),
+                Patient("P-1002", "이준호", "A-02", now - timedelta(days=8)),
+                Patient("P-1003", "박서연", "B-03", now - timedelta(days=4)),
+                Patient("P-1004", "최민수", "C-01", now - timedelta(days=1)),
+            ]
+        return list(self._patients)
 
     def get_sessions(self, patient_id: str) -> list[Session]:
         base = datetime.now(timezone.utc) - timedelta(hours=12)
@@ -71,3 +74,15 @@ class MockDataService:
 
     def delete_session(self, patient_id: str, session_id: str) -> None:
         return
+
+    def add_patient(self, patient_id: str, name: str, bed_number: str) -> None:
+        now = datetime.now(timezone.utc)
+        patient = Patient(patient_id, name, bed_number, now)
+        if self._patients is None:
+            self._patients = []
+        self._patients.append(patient)
+
+    def delete_patient(self, patient_id: str) -> None:
+        if self._patients is None:
+            return
+        self._patients = [p for p in self._patients if p.patient_id != patient_id]

@@ -44,6 +44,17 @@ class FirestoreService:
             )
         return patients
 
+    def add_patient(self, patient_id: str, name: str, bed_number: str) -> None:
+        self.connect()
+        self._db().collection("patients").document(patient_id).set(
+            {
+                "name": name,
+                "bedNumber": bed_number,
+                "createdAt": datetime.now(timezone.utc),
+            },
+            merge=True,
+        )
+
     def get_sessions(self, patient_id: str) -> list[Session]:
         self.connect()
         docs = (
@@ -116,6 +127,14 @@ class FirestoreService:
         if count > 0:
             batch.commit()
         session_ref.delete()
+
+    def delete_patient(self, patient_id: str) -> None:
+        self.connect()
+        patient_ref = self._db().collection("patients").document(patient_id)
+        sessions_ref = patient_ref.collection("sessions")
+        for session_doc in sessions_ref.stream():
+            self.delete_session(patient_id, session_doc.id)
+        patient_ref.delete()
 
 
 def _to_datetime(value: Any) -> datetime:

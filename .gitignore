@@ -1,1 +1,24 @@
 serviceAccountKey.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+.env
+
+# Android / IntelliJ
+.idea/
+.gradle/
+local.properties
+*.iml
+
+# Build outputs
+build/
+**/build/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/

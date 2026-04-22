@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QPushButton,
     QListWidget,
     QListWidgetItem,
     QVBoxLayout,
@@ -19,6 +20,8 @@ from utils.resource_utils import resolve_asset
 
 class Sidebar(QFrame):
     patient_selected = pyqtSignal(Patient)
+    add_patient_requested = pyqtSignal()
+    delete_patient_requested = pyqtSignal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -38,6 +41,19 @@ class Sidebar(QFrame):
         header.addWidget(title)
         header.addStretch(1)
         layout.addLayout(header)
+
+        add_row = QHBoxLayout()
+        add_btn = QPushButton("환자 추가")
+        add_btn.setObjectName("Ghost")
+        add_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        add_btn.clicked.connect(self.add_patient_requested.emit)
+        delete_btn = QPushButton("환자 삭제")
+        delete_btn.setObjectName("Ghost")
+        delete_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        delete_btn.clicked.connect(self.delete_patient_requested.emit)
+        add_row.addWidget(add_btn)
+        add_row.addWidget(delete_btn)
+        layout.addLayout(add_row)
 
         search_row = QHBoxLayout()
         self.search_input = QLineEdit()
